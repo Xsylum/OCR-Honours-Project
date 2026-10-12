@@ -16,6 +16,25 @@ Our sample generation pipeline will have the following steps:
 
 [TO RESEARCH]: DiffusionPen https://github.com/koninik/DiffusionPen https://arxiv.org/abs/2409.06065
 
+## Setting up .venv for DiffusionPen
+
+```
+python -m venv .venv
+source .venv/Scripts/activate
+
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install diffusers transformers accelerate einops pillow scikit-image opencv-python numpy timm tqdm wandb
+```
+
 ## References
+
+Experimenting with the DiffusionPen model for generating handwritten text from images.
+
+@article{nikolaidou2024diffusionpen,
+  title={DiffusionPen: Towards Controlling the Style of Handwritten Text Generation},
+  author={Nikolaidou, Konstantina and Retsinas, George and Sfikas, Giorgos and Liwicki, Marcus},
+  journal={arXiv preprint arXiv:2409.06065},
+  year={2024}
+}
 
 See "AI_Attributions.md" for more in-depth conversation histories
