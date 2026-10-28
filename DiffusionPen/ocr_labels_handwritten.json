@@ -1,0 +1,24 @@
+[
+    {
+        "file": "horizontal_output.png",
+        "box": [
+            40,
+            75,
+            354,
+            102
+        ],
+        "rotation_deg": -0.06137987741169404,
+        "jitter_px": -4
+    },
+    {
+        "file": "horizontal_output.png",
+        "box": [
+            432,
+            79,
+            353,
+            114
+        ],
+        "rotation_deg": 2.560804984812523,
+        "jitter_px": 4
+    }
+]

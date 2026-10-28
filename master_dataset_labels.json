@@ -1,0 +1,712 @@
+[
+    {
+        "image_file": "label_0.png",
+        "ground_truth": "Stigmatrachelus peyrierasi",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Stig.png",
+                "text": "Stig",
+                "box": [
+                    40,
+                    45,
+                    119,
+                    108
+                ],
+                "rotation_deg": -0.7133509207386034,
+                "jitter_px": 2,
+                "scale": 1.6875
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_matra.png",
+                "text": "matra",
+                "box": [
+                    167,
+                    68,
+                    158,
+                    52
+                ],
+                "rotation_deg": -1.3377407102198107,
+                "jitter_px": -3,
+                "scale": 0.8253968253968255
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_che.png",
+                "text": "che",
+                "box": [
+                    328,
+                    66,
+                    113,
+                    60
+                ],
+                "rotation_deg": 0.26222550263188227,
+                "jitter_px": 3,
+                "scale": 0.9375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_lus.png",
+                "text": "lus",
+                "box": [
+                    445,
+                    61,
+                    83,
+                    61
+                ],
+                "rotation_deg": -0.7405046278789341,
+                "jitter_px": -1,
+                "scale": 0.9375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_pey.png",
+                "text": "pey",
+                "box": [
+                    530,
+                    80,
+                    85,
+                    68
+                ],
+                "rotation_deg": 0.6894774803191552,
+                "jitter_px": -3,
+                "scale": 1.0793650793650793
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_5_rie.png",
+                "text": "rie",
+                "box": [
+                    623,
+                    70,
+                    68,
+                    52
+                ],
+                "rotation_deg": 0.6309691259892007,
+                "jitter_px": -1,
+                "scale": 0.8253968253968255
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_6_rasi.png",
+                "text": "rasi",
+                "box": [
+                    693,
+                    73,
+                    95,
+                    52
+                ],
+                "rotation_deg": -1.1323557528835917,
+                "jitter_px": 2,
+                "scale": 0.8125000000000001
+            }
+        ]
+    },
+    {
+        "image_file": "label_1.png",
+        "ground_truth": "Platydracus sladeae",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Pla.png",
+                "text": "Pla",
+                "box": [
+                    40,
+                    44,
+                    114,
+                    80
+                ],
+                "rotation_deg": 0.43330134841276413,
+                "jitter_px": 1,
+                "scale": 1.2698412698412698
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_tydra.png",
+                "text": "tydra",
+                "box": [
+                    161,
+                    61,
+                    172,
+                    89
+                ],
+                "rotation_deg": 0.5090564193359706,
+                "jitter_px": -2,
+                "scale": 1.4426229508196722
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_cus.png",
+                "text": "cus",
+                "box": [
+                    341,
+                    84,
+                    89,
+                    42
+                ],
+                "rotation_deg": 1.4660781090108532,
+                "jitter_px": 2,
+                "scale": 0.6451612903225806
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_sla.png",
+                "text": "sla",
+                "box": [
+                    435,
+                    63,
+                    96,
+                    60
+                ],
+                "rotation_deg": 0.591739968292539,
+                "jitter_px": 0,
+                "scale": 0.9375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_deae.png",
+                "text": "deae",
+                "box": [
+                    537,
+                    64,
+                    138,
+                    60
+                ],
+                "rotation_deg": -0.048629041840716924,
+                "jitter_px": 1,
+                "scale": 0.9523809523809523
+            }
+        ]
+    },
+    {
+        "image_file": "label_2.png",
+        "ground_truth": "Pinacotarsus proximus",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Pina.png",
+                "text": "Pina",
+                "box": [
+                    40,
+                    45,
+                    140,
+                    81
+                ],
+                "rotation_deg": 0.3166350162317415,
+                "jitter_px": 2,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_cotar.png",
+                "text": "cotar",
+                "box": [
+                    187,
+                    73,
+                    127,
+                    53
+                ],
+                "rotation_deg": 1.1117943249552908,
+                "jitter_px": 2,
+                "scale": 0.8125000000000001
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_sus.png",
+                "text": "sus",
+                "box": [
+                    321,
+                    82,
+                    94,
+                    40
+                ],
+                "rotation_deg": -1.394691725007152,
+                "jitter_px": -2,
+                "scale": 0.6451612903225806
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_proxi.png",
+                "text": "proxi",
+                "box": [
+                    421,
+                    72,
+                    134,
+                    79
+                ],
+                "rotation_deg": -1.2380032570094777,
+                "jitter_px": 1,
+                "scale": 1.2698412698412698
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_mus.png",
+                "text": "mus",
+                "box": [
+                    555,
+                    82,
+                    135,
+                    42
+                ],
+                "rotation_deg": -1.1183976801750508,
+                "jitter_px": 0,
+                "scale": 0.6666666666666666
+            }
+        ]
+    },
+    {
+        "image_file": "label_3.png",
+        "ground_truth": "Meliboeus caucasicus",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Meli.png",
+                "text": "Meli",
+                "box": [
+                    40,
+                    44,
+                    109,
+                    81
+                ],
+                "rotation_deg": -1.0717018587661054,
+                "jitter_px": 1,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_boeus.png",
+                "text": "boeus",
+                "box": [
+                    149,
+                    65,
+                    200,
+                    62
+                ],
+                "rotation_deg": -0.7640832386674818,
+                "jitter_px": 2,
+                "scale": 0.9375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_cau.png",
+                "text": "cau",
+                "box": [
+                    354,
+                    81,
+                    114,
+                    40
+                ],
+                "rotation_deg": 0.3655687693019938,
+                "jitter_px": -3,
+                "scale": 0.6451612903225806
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_casi.png",
+                "text": "casi",
+                "box": [
+                    472,
+                    76,
+                    110,
+                    53
+                ],
+                "rotation_deg": -1.4987498928513863,
+                "jitter_px": 3,
+                "scale": 0.8253968253968255
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_cus.png",
+                "text": "cus",
+                "box": [
+                    583,
+                    81,
+                    94,
+                    42
+                ],
+                "rotation_deg": 1.0836619542736567,
+                "jitter_px": -2,
+                "scale": 0.6451612903225806
+            }
+        ]
+    },
+    {
+        "image_file": "label_4.png",
+        "ground_truth": "Cyrtepistomus testatus",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Cyrte.png",
+                "text": "Cyrte",
+                "box": [
+                    40,
+                    41,
+                    184,
+                    110
+                ],
+                "rotation_deg": -1.2126342875978016,
+                "jitter_px": -2,
+                "scale": 1.6875
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_pisto.png",
+                "text": "pisto",
+                "box": [
+                    228,
+                    71,
+                    115,
+                    80
+                ],
+                "rotation_deg": -0.7818834706982215,
+                "jitter_px": -2,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_mus.png",
+                "text": "mus",
+                "box": [
+                    345,
+                    86,
+                    140,
+                    40
+                ],
+                "rotation_deg": -1.1962268821855653,
+                "jitter_px": 0,
+                "scale": 0.6557377049180327
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_testa.png",
+                "text": "testa",
+                "box": [
+                    485,
+                    73,
+                    107,
+                    52
+                ],
+                "rotation_deg": 0.6896596927199368,
+                "jitter_px": 0,
+                "scale": 0.8125000000000001
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_tus.png",
+                "text": "tus",
+                "box": [
+                    598,
+                    74,
+                    76,
+                    51
+                ],
+                "rotation_deg": 1.2566280567275303,
+                "jitter_px": 0,
+                "scale": 0.8253968253968255
+            }
+        ]
+    },
+    {
+        "image_file": "label_5.png",
+        "ground_truth": "Stenelmis grossepunctata",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Ste.png",
+                "text": "Ste",
+                "box": [
+                    40,
+                    41,
+                    126,
+                    80
+                ],
+                "rotation_deg": -0.6889508246680569,
+                "jitter_px": -2,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_nelmis.png",
+                "text": "nelmis",
+                "box": [
+                    173,
+                    64,
+                    271,
+                    61
+                ],
+                "rotation_deg": 0.5563587202167923,
+                "jitter_px": 1,
+                "scale": 1.1764705882352942
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_grosse.png",
+                "text": "grosse",
+                "box": [
+                    452,
+                    82,
+                    167,
+                    68
+                ],
+                "rotation_deg": -1.2064052102470828,
+                "jitter_px": 0,
+                "scale": 1.0793650793650793
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_punc.png",
+                "text": "punc",
+                "box": [
+                    620,
+                    86,
+                    133,
+                    69
+                ],
+                "rotation_deg": 0.6635546481475032,
+                "jitter_px": 3,
+                "scale": 1.0793650793650793
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_tata.png",
+                "text": "tata",
+                "box": [
+                    757,
+                    74,
+                    94,
+                    52
+                ],
+                "rotation_deg": -0.12607345679494308,
+                "jitter_px": 3,
+                "scale": 0.8125000000000001
+            }
+        ]
+    },
+    {
+        "image_file": "label_6.png",
+        "ground_truth": "Plagiometriona suspecta",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Pla.png",
+                "text": "Pla",
+                "box": [
+                    40,
+                    42,
+                    107,
+                    81
+                ],
+                "rotation_deg": -1.0629548551367116,
+                "jitter_px": -1,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_giome.png",
+                "text": "giome",
+                "box": [
+                    147,
+                    74,
+                    131,
+                    80
+                ],
+                "rotation_deg": 0.25942788697218355,
+                "jitter_px": 2,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_triona.png",
+                "text": "triona",
+                "box": [
+                    285,
+                    69,
+                    150,
+                    52
+                ],
+                "rotation_deg": 1.0191530449707358,
+                "jitter_px": -3,
+                "scale": 0.8253968253968255
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_sus.png",
+                "text": "sus",
+                "box": [
+                    440,
+                    85,
+                    88,
+                    40
+                ],
+                "rotation_deg": 0.10437454248959543,
+                "jitter_px": 1,
+                "scale": 0.625
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_pecta.png",
+                "text": "pecta",
+                "box": [
+                    532,
+                    71,
+                    145,
+                    79
+                ],
+                "rotation_deg": -1.2780146363260643,
+                "jitter_px": -1,
+                "scale": 1.25
+            }
+        ]
+    },
+    {
+        "image_file": "label_7.png",
+        "ground_truth": "Troglophyes bedeli",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Tro.png",
+                "text": "Tro",
+                "box": [
+                    40,
+                    40,
+                    103,
+                    80
+                ],
+                "rotation_deg": -0.10487637079207612,
+                "jitter_px": -3,
+                "scale": 1.2698412698412698
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_glo.png",
+                "text": "glo",
+                "box": [
+                    145,
+                    64,
+                    81,
+                    88
+                ],
+                "rotation_deg": -0.458903527991108,
+                "jitter_px": 1,
+                "scale": 1.375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_phyes.png",
+                "text": "phyes",
+                "box": [
+                    234,
+                    66,
+                    181,
+                    88
+                ],
+                "rotation_deg": 0.11649674878805216,
+                "jitter_px": 3,
+                "scale": 1.6296296296296298
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_bedeli.png",
+                "text": "bedeli",
+                "box": [
+                    420,
+                    59,
+                    170,
+                    61
+                ],
+                "rotation_deg": -0.3823834070395984,
+                "jitter_px": -3,
+                "scale": 0.9523809523809523
+            }
+        ]
+    },
+    {
+        "image_file": "label_8.png",
+        "ground_truth": "Metius subcoeruleus",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Metius.png",
+                "text": "Metius",
+                "box": [
+                    40,
+                    43,
+                    209,
+                    80
+                ],
+                "rotation_deg": 0.05833698294188383,
+                "jitter_px": 0,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_sub.png",
+                "text": "sub",
+                "box": [
+                    252,
+                    60,
+                    111,
+                    60
+                ],
+                "rotation_deg": -0.23902309602576555,
+                "jitter_px": -3,
+                "scale": 0.9375
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_coeru.png",
+                "text": "coeru",
+                "box": [
+                    365,
+                    85,
+                    136,
+                    41
+                ],
+                "rotation_deg": 1.3480611682585537,
+                "jitter_px": 3,
+                "scale": 0.625
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_leus.png",
+                "text": "leus",
+                "box": [
+                    508,
+                    65,
+                    131,
+                    60
+                ],
+                "rotation_deg": 1.3502722482087877,
+                "jitter_px": 1,
+                "scale": 0.9375
+            }
+        ]
+    },
+    {
+        "image_file": "label_9.png",
+        "ground_truth": "Athrostictus puberulus",
+        "words": [
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_0_Athro.png",
+                "text": "Athro",
+                "box": [
+                    40,
+                    42,
+                    169,
+                    80
+                ],
+                "rotation_deg": 0.19130448293454383,
+                "jitter_px": -1,
+                "scale": 1.25
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_1_stic.png",
+                "text": "stic",
+                "box": [
+                    217,
+                    69,
+                    83,
+                    52
+                ],
+                "rotation_deg": -0.4384127520174963,
+                "jitter_px": -2,
+                "scale": 0.8125000000000001
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_2_tus.png",
+                "text": "tus",
+                "box": [
+                    308,
+                    68,
+                    70,
+                    52
+                ],
+                "rotation_deg": 0.9047695812818772,
+                "jitter_px": -3,
+                "scale": 0.8253968253968255
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_3_pube.png",
+                "text": "pube",
+                "box": [
+                    378,
+                    62,
+                    143,
+                    87
+                ],
+                "rotation_deg": -1.113285895605416,
+                "jitter_px": -1,
+                "scale": 1.4426229508196722
+            },
+            {
+                "file": "C:\\_University\\Y4S2\\Honours\\OCR-Honours-Project\\output_labels\\syl_4_rulus.png",
+                "text": "rulus",
+                "box": [
+                    522,
+                    64,
+                    138,
+                    60
+                ],
+                "rotation_deg": -0.05233060187629546,
+                "jitter_px": 1,
+                "scale": 0.9836065573770493
+            }
+        ]
+    }
+]

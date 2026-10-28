@@ -1,1 +1,11 @@
 **/.venv/
+DiffusionPen/stable-diffusion-v1-5/
+DiffusionPen/style_models/
+DiffusionPen/diffusionpen_iam_model_path/
+DiffusionPen/saved_iam_data/
+DiffusionPen/.cache/
+DiffusionPen/image_samples/
+CatalogueOfLife/col_coldp.zip
+CatalogueOfLife/*.part
+CatalogueOfLife/c0d033b6-1612-448b-ac4c-b8771774d0d3/
+output_labels/
