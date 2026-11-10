@@ -1,0 +1,74 @@
+[
+  {
+    "image_file": "label_2_Bembidion_succini.png",
+    "ground_truth": "Bembidion succini",
+    "words": [
+      {
+        "text": "Bembidion",
+        "box": [
+          39,
+          43,
+          290,
+          86
+        ]
+      },
+      {
+        "text": "succini",
+        "box": [
+          355,
+          68,
+          160,
+          55
+        ]
+      }
+    ]
+  },
+  {
+    "image_file": "label_6_Agonum_gratiosum.png",
+    "ground_truth": "Agonum gratiosum",
+    "words": [
+      {
+        "text": "Agonum",
+        "box": [
+          38,
+          41,
+          222,
+          114
+        ]
+      },
+      {
+        "text": "gratiosum",
+        "box": [
+          293,
+          70,
+          213,
+          84
+        ]
+      }
+    ]
+  },
+  {
+    "image_file": "label_7_Demonax_kalabi.png",
+    "ground_truth": "Demonax kalabi",
+    "words": [
+      {
+        "text": "Demonax",
+        "box": [
+          39,
+          42,
+          327,
+          87
+        ]
+      },
+      {
+        "text": "kalabi",
+        "box": [
+          391,
+          60,
+          164,
+          64
+        ]
+      }
+    ]
+  }
+]
