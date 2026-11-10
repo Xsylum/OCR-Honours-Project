@@ -5,9 +5,11 @@ the -z side). A camera at distance d, tilted away from the label normal, looks a
 the label. A label pixel maps to the photo by the homography H = K [r1 r2 t] S.
 
 Reads the label generator's output (master_dataset_labels.json + final_output_labels/) and
-writes several camera views per label plus one JSON with the warped OCR boxes:
+writes several camera views per label plus one JSON with the warped OCR boxes. Views include
+realism effects (effects.py) and, usually, an insect pin through the label (occluders.py):
 
     python -m ProjectiveProjection.camera --views 3
+    python -m ProjectiveProjection.camera --no-effects --pin-prob 0     # clean geometry only
 """
 
 import argparse
@@ -19,6 +21,9 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+from ProjectiveProjection import effects as fx
+from ProjectiveProjection.occluders import draw_pin, sample_pin
 
 
 @dataclass
@@ -139,12 +144,85 @@ def project_label(image, regions, cam, label_width_mm=22.0, background=110):
     return photo, warped, info
 
 
+def region_visibility(quad, image_size, occluded=None):
+    """(visible_fraction, occluded_fraction) of a quad: visible = in frame and not covered by an
+    occluder, relative to the whole quad; occluded = covered, relative to the in-frame part."""
+    q = np.asarray(quad, np.float64)
+    area = abs(cv2.contourArea(q.astype(np.float32)))
+    if area < 1e-6:
+        return 0.0, 0.0
+    if occluded is None:
+        return visible_fraction(q, image_size), 0.0
+    w, h = image_size
+    x0, y0 = np.clip(np.floor(q.min(axis=0)).astype(int), 0, [w, h])
+    x1, y1 = np.clip(np.ceil(q.max(axis=0)).astype(int) + 1, 0, [w, h])
+    if x1 <= x0 or y1 <= y0:
+        return 0.0, 0.0
+    mask = np.zeros((y1 - y0, x1 - x0), np.uint8)
+    cv2.fillPoly(mask, [np.round(q - [x0, y0]).astype(np.int32)], 1)
+    inside = mask.astype(bool)
+    covered = inside & occluded[y0:y1, x0:x1]
+    n_in, n_cov = inside.sum(), covered.sum()
+    in_frame = visible_fraction(q, image_size)
+    occ = n_cov / n_in if n_in else 0.0
+    return float(in_frame * (1 - occ)), float(occ)
+
+
+def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin=None):
+    """Full simulated photo: textured paper and background, optional pin, camera effects.
+
+    `rng` is a numpy Generator. Returns (photo uint8 BGR, warped regions, info, occlusion mask).
+    """
+    if image.ndim == 2:
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    h, w = image.shape[:2]
+    H = homography(cam, label_to_world(w, h, label_width_mm / w))
+    size = tuple(cam.image_size)
+
+    paper = fx.paper_texture(image, rng) if effects else image.astype(np.float32)
+    warped = cv2.warpPerspective(paper, H, size, flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    alpha = cv2.warpPerspective(np.ones((h, w), np.float32), H, size, flags=cv2.INTER_LINEAR,
+                                borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    bg = fx.background(size, rng) if effects else np.full((size[1], size[0], 3), 110, np.float32)
+    photo = np.clip(bg * (1 - alpha[..., None]) + warped, 0, 255).astype(np.uint8)
+
+    light = fx.sample_light(rng) if effects else None
+    occluded = np.zeros((size[1], size[0]), bool)
+    occluders = []
+    if pin is not None:
+        occluded |= draw_pin(photo, cam, pin, alpha, light)
+        occluders.append(pin.to_json())
+
+    params = {}
+    if effects:
+        photo, params = fx.camera_effects(photo, rng, light)
+        params["light_dir"] = [round(float(v), 4) for v in light]
+
+    out = []
+    for r in regions:
+        q = warp_quad(H, r["quad"])
+        vis, occ = region_visibility(q, size, occluded)
+        out.append({"text": r["text"], "quad": _ql(q), "visible_fraction": round(vis, 3),
+                    "occluded_fraction": round(occ, 3)})
+    R, t, C = cam.pose()
+    info = {
+        "image_size": list(size),
+        "label_quad": _ql(warp_quad(H, [[0, 0], [w, 0], [w, h], [0, h]])),
+        "homography": H.round(8).tolist(),
+        "camera": {**asdict(cam), "K": cam.K.round(4).tolist(), "R": R.round(8).tolist(),
+                   "t": t.round(6).tolist(), "center_mm": C.round(4).tolist(), "label_width_mm": label_width_mm},
+        "occluders": occluders,
+        "effects": params,
+    }
+    return photo, out, info, occluded
+
+
 def _seed(*parts):
     return int(hashlib.sha1("|".join(map(str, parts)).encode()).hexdigest()[:8], 16)
 
 
 def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_width_mm=22.0,
-                    image_size=(1024, 768)):
+                    image_size=(1024, 768), effects=True, pin_prob=0.8, save_masks=False):
     """Project every label in master_dataset_labels.json; writes images + projected_dataset_labels.json."""
     entries = json.loads(Path(labels_json).read_text())
     images_dir, out_dir = Path(images_dir), Path(out_dir)
@@ -166,10 +244,14 @@ def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_wid
                 cam = sample_camera(rng, label_mm, image_size)
                 if in_front(cam, label_to_world(w, h, label_width_mm / w), w, h):
                     break
-            photo, warped, info = project_label(image, regions, cam, label_width_mm,
-                                                background=rng.uniform(60, 180))
+            nrng = np.random.default_rng(vseed)
+            pin = sample_pin(nrng, label_mm) if nrng.uniform() < pin_prob else None
+            photo, warped, info, occluded = render_view(image, regions, cam, nrng, label_width_mm, effects, pin)
             name = f"{stem}_v{k}.png"
             cv2.imwrite(str(out_dir / name), photo)
+            if save_masks:
+                info["occlusion_mask"] = f"{stem}_v{k}_occlusion.png"
+                cv2.imwrite(str(out_dir / info["occlusion_mask"]), occluded.astype(np.uint8) * 255)
             dataset.append({"image_file": name, "source_image": entry["image_file"],
                             "ground_truth": entry["ground_truth"], "seed": vseed, "words": warped, **info})
             if len(previews) < 12:
@@ -188,10 +270,12 @@ def _preview(photo, regions, info, width=420):
     vis = photo.copy() if photo.ndim == 3 else cv2.cvtColor(photo, cv2.COLOR_GRAY2BGR)
     cv2.polylines(vis, [np.int32(info["label_quad"])], True, (0, 200, 255), 2)
     for r in regions:
-        cv2.polylines(vis, [np.int32(r["quad"])], True, (255, 0, 0), 2)
+        occluded = r.get("occluded_fraction", 0) > 0.02
+        cv2.polylines(vis, [np.int32(r["quad"])], True, (0, 0, 255) if occluded else (255, 0, 0), 2)
     cam = info["camera"]
     vis = cv2.resize(vis, (width, int(vis.shape[0] * width / vis.shape[1])), interpolation=cv2.INTER_AREA)
-    cv2.putText(vis, f"d={cam['distance_mm']:.0f}mm tilt={cam['tilt_deg']:.0f} roll={cam['roll_deg']:.0f}",
+    pin = " pin" if info.get("occluders") else ""
+    cv2.putText(vis, f"d={cam['distance_mm']:.0f}mm tilt={cam['tilt_deg']:.0f} roll={cam['roll_deg']:.0f}{pin}",
                 (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
     return vis
 
@@ -205,8 +289,13 @@ def main(argv=None):
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--label-width-mm", type=float, default=22.0, help="physical width of the label")
     p.add_argument("--image-size", type=int, nargs=2, default=[1024, 768])
+    p.add_argument("--no-effects", action="store_true", help="clean render: no paper/background texture, "
+                                                              "lighting, blur, noise or JPEG")
+    p.add_argument("--pin-prob", type=float, default=0.8, help="chance that a view has a pin through the label")
+    p.add_argument("--save-masks", action="store_true", help="also write a per-view occlusion mask PNG")
     a = p.parse_args(argv)
-    project_dataset(a.labels, a.images, a.out, a.views, a.seed, a.label_width_mm, tuple(a.image_size))
+    project_dataset(a.labels, a.images, a.out, a.views, a.seed, a.label_width_mm, tuple(a.image_size),
+                    effects=not a.no_effects, pin_prob=a.pin_prob, save_masks=a.save_masks)
 
 
 if __name__ == "__main__":
