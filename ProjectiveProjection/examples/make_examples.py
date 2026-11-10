@@ -3,10 +3,11 @@
     python -m ProjectiveProjection.examples.make_examples
 
 - long_names/: labels in long_names/inputs/ (images only, no OCR boxes), so word boxes are
-  found from the ink. Each label gets several camera views.
+  found from the ink. Each label gets several camera views, all in a plastic sleeve.
 - sample_labels/: the label generator's committed sample (master_dataset_labels.json +
   final_output_labels/), one view per label.
-- stages.png: one label through the stages: original -> clean projection -> pin + effects.
+- stages.jpg: one label through the stages: original -> clean projection -> pin, plastic
+  sleeve, lens distortion + effects.
 
 Example photos are saved as JPEG to keep the repo small.
 """
@@ -22,7 +23,9 @@ import numpy as np
 
 from ProjectiveProjection.camera import (box_to_quad, in_front, label_to_world, project_dataset, render_view,
                                          sample_camera)
+from ProjectiveProjection.lens import Lens
 from ProjectiveProjection.occluders import sample_pin
+from ProjectiveProjection.sleeve import sample_sleeve
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -68,7 +71,7 @@ def to_jpeg(out_dir, quality=90):
         sheet.unlink()
 
 
-def long_names(views=3):
+def long_names(views=4):
     inputs = HERE / "long_names" / "inputs"
     entries = []
     for path in sorted(inputs.glob("*.png")):
@@ -79,7 +82,7 @@ def long_names(views=3):
     labels_json.write_text(json.dumps(entries, indent=2))
     out = HERE / "long_names" / "projected"
     shutil.rmtree(out, ignore_errors=True)
-    project_dataset(labels_json, inputs, out, views=views, seed=1)
+    project_dataset(labels_json, inputs, out, views=views, seed=1, sleeve_prob=1.0)
     to_jpeg(out)
     return entries
 
@@ -92,7 +95,7 @@ def sample_labels():
 
 
 def stages(entry, seed=4, height=300):
-    """Original label | clean projection | same camera with pin + realism effects (boxes drawn)."""
+    """Original label | clean projection | same camera with pin, sleeve, lens + realism effects | boxes."""
     image = cv2.imread(str(HERE / "long_names" / "inputs" / entry["image_file"]))
     h, w = image.shape[:2]
     regions = [{"text": wd["text"], "quad": box_to_quad(wd["box"])} for wd in entry["words"]]
@@ -104,11 +107,15 @@ def stages(entry, seed=4, height=300):
             break
     nrng = np.random.default_rng(seed)
     pin = sample_pin(nrng, label_mm)
+    sleeve = sample_sleeve(nrng, label_mm, cam)
+    sleeve.fog, sleeve.scratches, sleeve.scuffs = 0.5, 40, 3
+    lens = Lens(k1=-0.25, k2=0.03)
     clean, *_ = render_view(image, regions, cam, np.random.default_rng(seed), effects=False)
-    real, warped, _, _ = render_view(image, regions, cam, nrng, effects=True, pin=pin)
+    real, warped, _, _ = render_view(image, regions, cam, nrng, effects=True, pin=pin, sleeve=sleeve, lens=lens)
     boxed = real.copy()
     for r in warped:
-        color = (0, 0, 255) if r["occluded_fraction"] > 0.02 else (255, 0, 0)
+        color = (255, 0, 255) if r["glare_fraction"] > 0.1 else (255, 0, 0)
+        color = (0, 0, 255) if r["occluded_fraction"] > 0.02 else color
         cv2.polylines(boxed, [np.int32(r["quad"])], True, color, 2, cv2.LINE_AA)
 
     original = image.copy()
@@ -117,7 +124,7 @@ def stages(entry, seed=4, height=300):
         cv2.rectangle(original, (x, y), (x + bw, y + bh), (255, 0, 0), 2)
     panels = []
     for title, img in [("1. generated label + word boxes", original), ("2. virtual camera (clean)", clean),
-                       ("3. + pin, shadow, lighting, blur, noise", real), ("4. ground-truth boxes after projection", boxed)]:
+                       ("3. + pin, plastic sleeve, lens, light, noise...", real), ("4. ground-truth boxes after projection", boxed)]:
         img = cv2.resize(img, (int(img.shape[1] * height / img.shape[0]), height), interpolation=cv2.INTER_AREA)
         canvas = np.full((height + 34, img.shape[1], 3), 255, np.uint8)
         canvas[34:] = img

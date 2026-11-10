@@ -6,7 +6,8 @@ the label. A label pixel maps to the photo by the homography H = K [r1 r2 t] S.
 
 Reads the label generator's output (master_dataset_labels.json + final_output_labels/) and
 writes several camera views per label plus one JSON with the warped OCR boxes. Views include
-realism effects (effects.py) and, usually, an insect pin through the label (occluders.py):
+realism effects (effects.py) and, usually, an insect pin through the label, sometimes with
+other labels stacked on it (occluders.py):
 
     python -m ProjectiveProjection.camera --views 3
     python -m ProjectiveProjection.camera --no-effects --pin-prob 0     # clean geometry only
@@ -23,7 +24,12 @@ import cv2
 import numpy as np
 
 from ProjectiveProjection import effects as fx
-from ProjectiveProjection.occluders import draw_pin, sample_pin
+from ProjectiveProjection.lens import apply as apply_distortion
+from ProjectiveProjection.lens import distort_points, distortion_maps, sample_lens
+from ProjectiveProjection.occluders import (NEAR_MM, draw_pin_head, draw_pin_piece, label_shadow, pin_shadow,
+                                            plane_homography, printed_label, project_points, sample_pin,
+                                            sample_stack)
+from ProjectiveProjection.sleeve import composite_sleeve, sample_sleeve
 
 
 @dataclass
@@ -168,9 +174,31 @@ def region_visibility(quad, image_size, occluded=None):
     return float(in_frame * (1 - occ)), float(occ)
 
 
-def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin=None):
-    """Full simulated photo: textured paper and background, optional pin, camera effects.
+def _composite(photo, texture, H, size):
+    """Warp a float texture into the uint8 photo in place (over what's there); returns its alpha."""
+    th, tw = texture.shape[:2]
+    warped = cv2.warpPerspective(texture, H, size, flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    alpha = cv2.warpPerspective(np.ones((th, tw), np.float32), H, size, flags=cv2.INTER_LINEAR,
+                                borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    photo[:] = np.clip(photo * (1 - alpha[..., None]) + warped, 0, 255).astype(np.uint8)
+    return alpha
 
+
+def _plane_in_front(cam, A, z, tex_w, tex_h):
+    corners = (A @ np.array([[0, 0, 1], [tex_w, 0, 1], [tex_w, tex_h, 1], [0, tex_h, 1]], float).T).T
+    _, depth = project_points(cam, np.column_stack([corners[:, :2], np.full(4, z)]))
+    return bool(np.all(depth > NEAR_MM))
+
+
+def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin=None, stack=(),
+                stack_textures=None, shadow_strength=0.35, sleeve=None, lens=None, glare_threshold=0.35):
+    """Full simulated photo: textured paper and background, optional pin with other labels stacked
+    on it, optional clear plastic sleeve over the label, lens distortion, camera effects.
+
+    Layers are painted back to front (planes parallel to the label, so larger z is always
+    farther), with the pin drawn piecewise between them. `stack_textures` maps a
+    StackedLabel.source to its face image; "printed" faces are generated. Lens distortion
+    bends the finished scene, and every output quad goes through the same model.
     `rng` is a numpy Generator. Returns (photo uint8 BGR, warped regions, info, occlusion mask).
     """
     if image.ndim == 2:
@@ -178,20 +206,71 @@ def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin
     h, w = image.shape[:2]
     H = homography(cam, label_to_world(w, h, label_width_mm / w))
     size = tuple(cam.image_size)
+    label_mm = (label_width_mm, label_width_mm * h / w)
+    stack = list(stack) if pin is not None else []
 
-    paper = fx.paper_texture(image, rng) if effects else image.astype(np.float32)
-    warped = cv2.warpPerspective(paper, H, size, flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
-    alpha = cv2.warpPerspective(np.ones((h, w), np.float32), H, size, flags=cv2.INTER_LINEAR,
-                                borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    def to_photo(quad):
+        q = warp_quad(H, quad)
+        return distort_points(lens, cam.K, size, q) if lens is not None else q
+
     bg = fx.background(size, rng) if effects else np.full((size[1], size[0], 3), 110, np.float32)
-    photo = np.clip(bg * (1 - alpha[..., None]) + warped, 0, 255).astype(np.uint8)
-
+    photo = bg.astype(np.uint8)
     light = fx.sample_light(rng) if effects else None
-    occluded = np.zeros((size[1], size[0]), bool)
+    occ = np.zeros((size[1], size[0]), np.uint8)
     occluders = []
+
+    faces = {}
+    for s in stack:
+        face = printed_label(rng) if s.source == "printed" else (stack_textures or {}).get(s.source)
+        if face is None:
+            face = printed_label(rng)
+        faces[id(s)] = fx.paper_texture(face, rng) if effects else face.astype(np.float32)
+
+    layers = [(0.0, "label", None)] + [(s.z_mm, "stacked", s) for s in stack]
+    if sleeve is not None:
+        layers.append((sleeve.z_mm, "sleeve", sleeve))
+    layers.sort(key=lambda layer: -layer[0])
+    glare = None
+    z_prev = pin.below_mm if pin is not None else None
+    for z, kind, s in layers:
+        if pin is not None:
+            draw_pin_piece(photo, cam, pin, z_prev, z, occ if z_prev <= 0 else None)
+            z_prev = z
+        if kind == "sleeve":
+            glare = composite_sleeve(photo, s, cam, label_mm)
+        elif kind == "label":
+            paper = fx.paper_texture(image, rng) if effects else image.astype(np.float32)
+            alpha = _composite(photo, paper, H, size)
+            if light is not None and pin is not None:
+                shade = pin_shadow(cam, pin, light, size)
+                for above in (a for a in stack if a.z_mm < 0):
+                    th, tw = faces[id(above)].shape[:2]
+                    A = above.world_transform(pin, tw, th)
+                    shade = np.maximum(shade, label_shadow(cam, A, above.z_mm, (tw, th), light, size))
+                photo[:] = np.clip(photo * (1 - shadow_strength * shade * alpha)[..., None], 0, 255).astype(np.uint8)
+        else:
+            face = faces[id(s)]
+            th, tw = face.shape[:2]
+            A = s.world_transform(pin, tw, th)
+            if not _plane_in_front(cam, A, s.z_mm, tw, th):
+                continue
+            a = _composite(photo, face, plane_homography(cam, s.z_mm, A), size)
+            if s.z_mm < 0:
+                occ[a > 0.5] = 255
+            occluders.append(s.to_json())
     if pin is not None:
-        occluded |= draw_pin(photo, cam, pin, alpha, light)
-        occluders.append(pin.to_json())
+        draw_pin_piece(photo, cam, pin, z_prev, -pin.length_mm, occ)
+        draw_pin_head(photo, cam, pin, occ)
+        occluders.insert(0, pin.to_json())
+
+    if lens is not None:
+        maps = distortion_maps(lens, cam.K, size)
+        photo = apply_distortion(maps, photo)
+        occ = apply_distortion(maps, occ, border=cv2.BORDER_CONSTANT)
+        if glare is not None:
+            glare = apply_distortion(maps, glare, border=cv2.BORDER_CONSTANT)
+    occluded = occ > 127
+    glared = glare > glare_threshold if glare is not None else None
 
     params = {}
     if effects:
@@ -200,18 +279,21 @@ def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin
 
     out = []
     for r in regions:
-        q = warp_quad(H, r["quad"])
-        vis, occ = region_visibility(q, size, occluded)
+        q = to_photo(r["quad"])
+        vis, occ_frac = region_visibility(q, size, occluded)
+        glare_frac = region_visibility(q, size, glared)[1] if glared is not None else 0.0
         out.append({"text": r["text"], "quad": _ql(q), "visible_fraction": round(vis, 3),
-                    "occluded_fraction": round(occ, 3)})
+                    "occluded_fraction": round(occ_frac, 3), "glare_fraction": round(glare_frac, 3)})
     R, t, C = cam.pose()
     info = {
         "image_size": list(size),
-        "label_quad": _ql(warp_quad(H, [[0, 0], [w, 0], [w, h], [0, h]])),
+        "label_quad": _ql(to_photo([[0, 0], [w, 0], [w, h], [0, h]])),
         "homography": H.round(8).tolist(),
         "camera": {**asdict(cam), "K": cam.K.round(4).tolist(), "R": R.round(8).tolist(),
-                   "t": t.round(6).tolist(), "center_mm": C.round(4).tolist(), "label_width_mm": label_width_mm},
+                   "t": t.round(6).tolist(), "center_mm": C.round(4).tolist(), "label_width_mm": label_width_mm,
+                   "distortion": lens.to_json() if lens is not None else None},
         "occluders": occluders,
+        "sleeve": sleeve.to_json() if sleeve is not None else None,
         "effects": params,
     }
     return photo, out, info, occluded
@@ -222,12 +304,27 @@ def _seed(*parts):
 
 
 def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_width_mm=22.0,
-                    image_size=(1024, 768), effects=True, pin_prob=0.8, save_masks=False):
-    """Project every label in master_dataset_labels.json; writes images + projected_dataset_labels.json."""
+                    image_size=(1024, 768), effects=True, pin_prob=0.8, save_masks=False, stack_prob=0.0,
+                    max_stack=3, sleeve_prob=0.4, distortion=1.0):
+    """Project every label in master_dataset_labels.json; writes images + projected_dataset_labels.json.
+
+    With a pin, a view gets 1..max_stack other labels on the same pin with probability
+    stack_prob; their faces are printed locality labels or other labels from this dataset.
+    With effects on, a view gets a plastic sleeve with probability sleeve_prob, and lens
+    distortion scaled by `distortion` (0 = ideal pinhole).
+    """
     entries = json.loads(Path(labels_json).read_text())
     images_dir, out_dir = Path(images_dir), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     dataset, previews = [], []
+    face_cache = {}
+
+    def faces_for(stack):
+        for s in stack:
+            if s.source != "printed" and s.source not in face_cache:
+                face_cache[s.source] = cv2.imread(str(images_dir / s.source), cv2.IMREAD_COLOR)
+        return face_cache
+
     for entry in entries:
         image = cv2.imread(str(images_dir / entry["image_file"]), cv2.IMREAD_COLOR)
         if image is None:
@@ -246,7 +343,16 @@ def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_wid
                     break
             nrng = np.random.default_rng(vseed)
             pin = sample_pin(nrng, label_mm) if nrng.uniform() < pin_prob else None
-            photo, warped, info, occluded = render_view(image, regions, cam, nrng, label_width_mm, effects, pin)
+            stack = []
+            if pin is not None and stack_prob > 0 and nrng.uniform() < stack_prob:
+                camera_height = -cam.pose()[2][2]
+                others = [e["image_file"] for e in entries if e["image_file"] != entry["image_file"]]
+                stack = sample_stack(nrng, pin, label_mm, others, max_above_mm=0.6 * camera_height,
+                                     max_labels=max_stack)
+            sleeve = sample_sleeve(nrng, label_mm, cam) if effects and nrng.uniform() < sleeve_prob else None
+            lens = sample_lens(nrng, distortion) if effects and distortion > 0 else None
+            photo, warped, info, occluded = render_view(image, regions, cam, nrng, label_width_mm, effects, pin,
+                                                        stack, faces_for(stack), sleeve=sleeve, lens=lens)
             name = f"{stem}_v{k}.png"
             cv2.imwrite(str(out_dir / name), photo)
             if save_masks:
@@ -270,12 +376,17 @@ def _preview(photo, regions, info, width=420):
     vis = photo.copy() if photo.ndim == 3 else cv2.cvtColor(photo, cv2.COLOR_GRAY2BGR)
     cv2.polylines(vis, [np.int32(info["label_quad"])], True, (0, 200, 255), 2)
     for r in regions:
-        occluded = r.get("occluded_fraction", 0) > 0.02
-        cv2.polylines(vis, [np.int32(r["quad"])], True, (0, 0, 255) if occluded else (255, 0, 0), 2)
+        color = (255, 0, 0)
+        if r.get("glare_fraction", 0) > 0.1:
+            color = (255, 0, 255)
+        if r.get("occluded_fraction", 0) > 0.02:
+            color = (0, 0, 255)
+        cv2.polylines(vis, [np.int32(r["quad"])], True, color, 2)
     cam = info["camera"]
     vis = cv2.resize(vis, (width, int(vis.shape[0] * width / vis.shape[1])), interpolation=cv2.INTER_AREA)
-    pin = " pin" if info.get("occluders") else ""
-    cv2.putText(vis, f"d={cam['distance_mm']:.0f}mm tilt={cam['tilt_deg']:.0f} roll={cam['roll_deg']:.0f}{pin}",
+    tags = (" pin" if info.get("occluders") else "") + (" sleeve" if info.get("sleeve") else "")
+    k1 = f" k1={cam['distortion']['k1']:.2f}" if cam.get("distortion") else ""
+    cv2.putText(vis, f"d={cam['distance_mm']:.0f}mm tilt={cam['tilt_deg']:.0f}{k1}{tags}",
                 (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
     return vis
 
@@ -293,9 +404,18 @@ def main(argv=None):
                                                               "lighting, blur, noise or JPEG")
     p.add_argument("--pin-prob", type=float, default=0.8, help="chance that a view has a pin through the label")
     p.add_argument("--save-masks", action="store_true", help="also write a per-view occlusion mask PNG")
+    p.add_argument("--stack-prob", type=float, default=0.0,
+                   help="chance that a pinned view has other labels stacked on the same pin (off by default)")
+    p.add_argument("--max-stack", type=int, default=3, help="max number of stacked labels")
+    p.add_argument("--sleeve-prob", type=float, default=0.4,
+                   help="chance that the label is inside a clear plastic sleeve")
+    p.add_argument("--distortion", type=float, default=1.0,
+                   help="lens distortion strength (0 = ideal pinhole, 1 = typical phone/compact lens)")
     a = p.parse_args(argv)
     project_dataset(a.labels, a.images, a.out, a.views, a.seed, a.label_width_mm, tuple(a.image_size),
-                    effects=not a.no_effects, pin_prob=a.pin_prob, save_masks=a.save_masks)
+                    effects=not a.no_effects, pin_prob=a.pin_prob, save_masks=a.save_masks,
+                    stack_prob=a.stack_prob, max_stack=a.max_stack, sleeve_prob=a.sleeve_prob,
+                    distortion=a.distortion)
 
 
 if __name__ == "__main__":
