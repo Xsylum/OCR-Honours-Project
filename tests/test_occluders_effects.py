@@ -3,7 +3,7 @@ import numpy as np
 
 from ProjectiveProjection.camera import Camera, box_to_quad, project_label, render_view
 from ProjectiveProjection.lens import Lens
-from ProjectiveProjection.occluders import Pin, StackedLabel, sample_stack
+from ProjectiveProjection.occluders import BeetleBody, Pin, StackedLabel, sample_beetle, sample_stack
 from ProjectiveProjection.sleeve import Sleeve
 
 LABEL = np.full((100, 400, 3), 240, np.uint8)
@@ -128,6 +128,41 @@ def test_sleeve_lowers_text_contrast():
     ink = lambda img: img[350:418, 478:546].astype(float).mean()
     paper = lambda img: img[300:330, 300:400].astype(float).mean()
     assert 0.6 < (paper(sleeved) - ink(sleeved)) / (paper(plain) - ink(plain)) < 0.97
+
+
+def test_beetle_covers_a_slice_of_the_label_from_above():
+    beetle = BeetleBody(centre_mm=(0.0, 0.0, -3.0), radii_mm=(6.0, 3.0, 1.5), yaw_deg=0.0)
+    cam = Camera(distance_mm=60)
+    _, regions, info, occ = render_view(LABEL, [NEAR_PIN, FAR], cam, np.random.default_rng(0), 22.0, False,
+                                        beetle=beetle)
+    near, far = regions
+    assert near["occluded_fraction"] > 0.15  # beetle sits over the label centre
+    assert far["occluded_fraction"] < near["occluded_fraction"]
+    assert occ.any() and info["occluders"][-1]["type"] == "beetle"
+
+
+def test_oblique_view_sees_under_the_beetle():
+    """The point of a 3D body: text hidden top-down peeks out from under it at an angle."""
+    beetle = BeetleBody(centre_mm=(0.0, 0.0, -3.5), radii_mm=(7.0, 3.2, 1.6), yaw_deg=0.0)
+    args = (LABEL, [NEAR_PIN], np.random.default_rng(0), 22.0, False)
+    _, top_regions, _, _ = render_view(*args[:2], Camera(distance_mm=60), *args[2:], beetle=beetle)
+    _, side_regions, _, _ = render_view(*args[:2], Camera(distance_mm=60, tilt_deg=45, azimuth_deg=90),
+                                        *args[2:], beetle=beetle)
+    assert top_regions[0]["occluded_fraction"] > side_regions[0]["occluded_fraction"] + 0.08
+
+
+def test_sample_beetle_varies_size_and_position():
+    rng = np.random.default_rng(2)
+    label_mm = (22.0, 5.5)
+    fracs, centres = [], []
+    for _ in range(40):
+        beetle = sample_beetle(rng, label_mm)
+        a, b, _ = beetle.radii_mm
+        fracs.append(np.pi * a * b / (label_mm[0] * label_mm[1]))
+        centres.append(beetle.centre_mm[:2])
+        assert beetle.bottom_z() < -1.5  # high enough that oblique views can look under
+    assert min(fracs) < 0.30 and max(fracs) > 0.70  # both small and label-sized show up
+    assert np.ptp(centres, axis=0).min() > 1.0  # centres land on different parts of the label
 
 
 def test_fogged_sleeve_blurs_the_text():

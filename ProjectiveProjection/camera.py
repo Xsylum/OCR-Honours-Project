@@ -6,8 +6,8 @@ the label. A label pixel maps to the photo by the homography H = K [r1 r2 t] S.
 
 Reads the label generator's output (master_dataset_labels.json + final_output_labels/) and
 writes several camera views per label plus one JSON with the warped OCR boxes. Views include
-realism effects (effects.py) and, usually, an insect pin through the label, sometimes with
-other labels stacked on it (occluders.py):
+realism effects (effects.py) and, usually, an insect pin and a beetle body above the label
+(occluders.py), sometimes with other labels stacked on the pin:
 
     python -m ProjectiveProjection.camera --views 3
     python -m ProjectiveProjection.camera --no-effects --pin-prob 0     # clean geometry only
@@ -26,9 +26,9 @@ import numpy as np
 from ProjectiveProjection import effects as fx
 from ProjectiveProjection.lens import apply as apply_distortion
 from ProjectiveProjection.lens import distort_points, distortion_maps, sample_lens
-from ProjectiveProjection.occluders import (NEAR_MM, draw_pin_head, draw_pin_piece, label_shadow, pin_shadow,
-                                            plane_homography, printed_label, project_points, sample_pin,
-                                            sample_stack)
+from ProjectiveProjection.occluders import (NEAR_MM, beetle_shadow, draw_beetle, draw_pin_head, draw_pin_piece,
+                                            label_shadow, pin_shadow, plane_homography, printed_label,
+                                            project_points, sample_beetle, sample_pin, sample_stack)
 from ProjectiveProjection.sleeve import composite_sleeve, sample_sleeve
 
 
@@ -85,13 +85,23 @@ def in_front(cam, S, width_px, height_px):
 
 
 def sample_camera(rng, label_mm, image_size=(1024, 768), focal_mm=50.0, sensor_width_mm=36.0,
-                  fill=(0.4, 0.85), max_tilt=50.0, max_roll=10.0):
-    """Random but plausible 'photo of a label' camera: label spans `fill` of the frame width."""
+                  fill=(0.4, 0.85), max_tilt=50.0, max_roll=10.0, tilt_deg=None, azimuth_deg=None,
+                  tilt_jitter=0.0):
+    """Random but plausible 'photo of a label' camera: label spans `fill` of the frame width.
+
+    Pass `tilt_deg` / `azimuth_deg` to aim a specific view (with optional `tilt_jitter` degrees
+    of noise); otherwise tilt is sampled with more mass at oblique angles.
+    """
     f_px = focal_mm * image_size[0] / sensor_width_mm
     d = f_px * label_mm[0] / (rng.uniform(*fill) * image_size[0])
+    if tilt_deg is None:
+        tilt = max_tilt * np.sqrt(rng.uniform(0, 1))
+    else:
+        tilt = float(np.clip(tilt_deg + rng.uniform(-tilt_jitter, tilt_jitter), 0.0, max(max_tilt, tilt_deg)))
+    az = rng.uniform(0, 360) if azimuth_deg is None else float(azimuth_deg) % 360.0
     return Camera(distance_mm=d,
-                  tilt_deg=max_tilt * np.sqrt(rng.uniform(0, 1)),  # more mass at oblique angles
-                  azimuth_deg=rng.uniform(0, 360),
+                  tilt_deg=tilt,
+                  azimuth_deg=az,
                   roll_deg=rng.uniform(-max_roll, max_roll),
                   focal_mm=focal_mm, sensor_width_mm=sensor_width_mm, image_size=tuple(image_size),
                   target_mm=(rng.uniform(-0.1, 0.1) * label_mm[0], rng.uniform(-0.1, 0.1) * label_mm[1]))
@@ -191,14 +201,17 @@ def _plane_in_front(cam, A, z, tex_w, tex_h):
 
 
 def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin=None, stack=(),
-                stack_textures=None, shadow_strength=0.35, sleeve=None, lens=None, glare_threshold=0.35):
+                stack_textures=None, shadow_strength=0.35, sleeve=None, lens=None, beetle=None,
+                glare_threshold=0.35):
     """Full simulated photo: textured paper and background, optional pin with other labels stacked
-    on it, optional clear plastic sleeve over the label, lens distortion, camera effects.
+    on it, optional beetle body above the label, optional clear plastic sleeve, lens distortion,
+    camera effects.
 
     Layers are painted back to front (planes parallel to the label, so larger z is always
-    farther), with the pin drawn piecewise between them. `stack_textures` maps a
-    StackedLabel.source to its face image; "printed" faces are generated. Lens distortion
-    bends the finished scene, and every output quad goes through the same model.
+    farther), with the pin drawn piecewise between them. The beetle is an ellipsoid floating
+    above the paper, so an oblique view can see text a top-down view has hidden.
+    `stack_textures` maps a StackedLabel.source to its face image; "printed" faces are generated.
+    Lens distortion bends the finished scene, and every output quad goes through the same model.
     `rng` is a numpy Generator. Returns (photo uint8 BGR, warped regions, info, occlusion mask).
     """
     if image.ndim == 2:
@@ -241,8 +254,12 @@ def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin
         elif kind == "label":
             paper = fx.paper_texture(image, rng) if effects else image.astype(np.float32)
             alpha = _composite(photo, paper, H, size)
-            if light is not None and pin is not None:
-                shade = pin_shadow(cam, pin, light, size)
+            if light is not None and (pin is not None or beetle is not None):
+                shade = np.zeros((size[1], size[0]), np.float32)
+                if pin is not None:
+                    shade = np.maximum(shade, pin_shadow(cam, pin, light, size))
+                if beetle is not None:
+                    shade = np.maximum(shade, beetle_shadow(cam, beetle, light, size))
                 for above in (a for a in stack if a.z_mm < 0):
                     th, tw = faces[id(above)].shape[:2]
                     A = above.world_transform(pin, tw, th)
@@ -259,9 +276,20 @@ def render_view(image, regions, cam, rng, label_width_mm=22.0, effects=True, pin
                 occ[a > 0.5] = 255
             occluders.append(s.to_json())
     if pin is not None:
-        draw_pin_piece(photo, cam, pin, z_prev, -pin.length_mm, occ)
+        # Pin up to the beetle, then the body (so the shaft disappears into it), then the head above.
+        beetle_z = beetle.centre_mm[2] if beetle is not None else None
+        if beetle_z is not None:
+            draw_pin_piece(photo, cam, pin, z_prev, beetle_z, occ)
+            draw_beetle(photo, cam, beetle, light, occ)
+            occluders.append(beetle.to_json())
+            draw_pin_piece(photo, cam, pin, beetle_z, -pin.length_mm, occ)
+        else:
+            draw_pin_piece(photo, cam, pin, z_prev, -pin.length_mm, occ)
         draw_pin_head(photo, cam, pin, occ)
         occluders.insert(0, pin.to_json())
+    elif beetle is not None:
+        draw_beetle(photo, cam, beetle, light, occ)
+        occluders.append(beetle.to_json())
 
     if lens is not None:
         maps = distortion_maps(lens, cam.K, size)
@@ -304,14 +332,15 @@ def _seed(*parts):
 
 
 def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_width_mm=22.0,
-                    image_size=(1024, 768), effects=True, pin_prob=0.8, save_masks=False, stack_prob=0.0,
-                    max_stack=3, sleeve_prob=0.4, distortion=1.0):
+                    image_size=(1024, 768), effects=True, pin_prob=0.0, save_masks=False, stack_prob=0.0,
+                    max_stack=3, sleeve_prob=0.0, distortion=1.0, beetle_prob=0.7,
+                    beetle_tilt=(52.0, 72.0)):
     """Project every label in master_dataset_labels.json; writes images + projected_dataset_labels.json.
 
-    With a pin, a view gets 1..max_stack other labels on the same pin with probability
-    stack_prob; their faces are printed locality labels or other labels from this dataset.
-    With effects on, a view gets a plastic sleeve with probability sleeve_prob, and lens
-    distortion scaled by `distortion` (0 = ideal pinhole).
+    Pin, stacked labels and plastic sleeve are off by default. With probability beetle_prob a
+    view gets a beetle body above the label. Beetle views are spread across a ladder of oblique
+    tilts in `beetle_tilt` (a few degrees apart per view), looking across the body so text peeks
+    out from under it. With effects on, lens distortion is scaled by `distortion` (0 = pinhole).
     """
     entries = json.loads(Path(labels_json).read_text())
     images_dir, out_dir = Path(images_dir), Path(out_dir)
@@ -343,6 +372,31 @@ def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_wid
                     break
             nrng = np.random.default_rng(vseed)
             pin = sample_pin(nrng, label_mm) if nrng.uniform() < pin_prob else None
+            beetle = sample_beetle(nrng, label_mm, pin) if nrng.uniform() < beetle_prob else None
+            # ~40% of views (and every other beetle view) zoom in for a clear close-up of the name.
+            zoom = (k % 2 == 0) or nrng.uniform() < 0.25
+            fill = (0.82, 0.98) if zoom else (0.45, 0.7)
+            # Spread beetle views across several oblique tilts a few degrees apart, looking across
+            # the body so text that is hidden top-down peeks out from under it.
+            if beetle is not None:
+                lo, hi = beetle_tilt
+                target = lo + (hi - lo) * ((k + 0.5) / max(views, 1))
+                # Zoomed clear shots: a bit less extreme tilt so the handwriting stays readable.
+                if zoom:
+                    target = min(target, lo + 0.45 * (hi - lo))
+                # ±90° from the body's long axis = looking at the long edge (best look-under).
+                side = beetle.yaw_deg + (90.0 if nrng.uniform() < 0.5 else -90.0)
+                for _ in range(40):
+                    cam = sample_camera(rng, label_mm, image_size, max_tilt=max(hi + 5, 85),
+                                        tilt_deg=target, tilt_jitter=2.0,
+                                        azimuth_deg=side + float(nrng.uniform(-10, 10)), fill=fill)
+                    if in_front(cam, label_to_world(w, h, label_width_mm / w), w, h):
+                        break
+            elif zoom:
+                for _ in range(20):
+                    cam = sample_camera(rng, label_mm, image_size, fill=fill)
+                    if in_front(cam, label_to_world(w, h, label_width_mm / w), w, h):
+                        break
             stack = []
             if pin is not None and stack_prob > 0 and nrng.uniform() < stack_prob:
                 camera_height = -cam.pose()[2][2]
@@ -352,7 +406,8 @@ def project_dataset(labels_json, images_dir, out_dir, views=3, seed=0, label_wid
             sleeve = sample_sleeve(nrng, label_mm, cam) if effects and nrng.uniform() < sleeve_prob else None
             lens = sample_lens(nrng, distortion) if effects and distortion > 0 else None
             photo, warped, info, occluded = render_view(image, regions, cam, nrng, label_width_mm, effects, pin,
-                                                        stack, faces_for(stack), sleeve=sleeve, lens=lens)
+                                                        stack, faces_for(stack), sleeve=sleeve, lens=lens,
+                                                        beetle=beetle)
             name = f"{stem}_v{k}.png"
             cv2.imwrite(str(out_dir / name), photo)
             if save_masks:
@@ -384,7 +439,9 @@ def _preview(photo, regions, info, width=420):
         cv2.polylines(vis, [np.int32(r["quad"])], True, color, 2)
     cam = info["camera"]
     vis = cv2.resize(vis, (width, int(vis.shape[0] * width / vis.shape[1])), interpolation=cv2.INTER_AREA)
-    tags = (" pin" if info.get("occluders") else "") + (" sleeve" if info.get("sleeve") else "")
+    kinds = {o.get("type") for o in info.get("occluders") or []}
+    tags = ((" pin" if "pin" in kinds else "") + (" beetle" if "beetle" in kinds else "")
+            + (" sleeve" if info.get("sleeve") else ""))
     k1 = f" k1={cam['distortion']['k1']:.2f}" if cam.get("distortion") else ""
     cv2.putText(vis, f"d={cam['distance_mm']:.0f}mm tilt={cam['tilt_deg']:.0f}{k1}{tags}",
                 (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
@@ -402,20 +459,23 @@ def main(argv=None):
     p.add_argument("--image-size", type=int, nargs=2, default=[1024, 768])
     p.add_argument("--no-effects", action="store_true", help="clean render: no paper/background texture, "
                                                               "lighting, blur, noise or JPEG")
-    p.add_argument("--pin-prob", type=float, default=0.8, help="chance that a view has a pin through the label")
+    p.add_argument("--pin-prob", type=float, default=0.0,
+                   help="chance that a view has a pin through the label (off by default)")
     p.add_argument("--save-masks", action="store_true", help="also write a per-view occlusion mask PNG")
     p.add_argument("--stack-prob", type=float, default=0.0,
                    help="chance that a pinned view has other labels stacked on the same pin (off by default)")
     p.add_argument("--max-stack", type=int, default=3, help="max number of stacked labels")
-    p.add_argument("--sleeve-prob", type=float, default=0.4,
-                   help="chance that the label is inside a clear plastic sleeve")
+    p.add_argument("--sleeve-prob", type=float, default=0.0,
+                   help="chance that the label is inside a clear plastic sleeve (off by default)")
     p.add_argument("--distortion", type=float, default=1.0,
                    help="lens distortion strength (0 = ideal pinhole, 1 = typical phone/compact lens)")
+    p.add_argument("--beetle-prob", type=float, default=0.7,
+                   help="chance that a view has a beetle body above the label")
     a = p.parse_args(argv)
     project_dataset(a.labels, a.images, a.out, a.views, a.seed, a.label_width_mm, tuple(a.image_size),
                     effects=not a.no_effects, pin_prob=a.pin_prob, save_masks=a.save_masks,
                     stack_prob=a.stack_prob, max_stack=a.max_stack, sleeve_prob=a.sleeve_prob,
-                    distortion=a.distortion)
+                    distortion=a.distortion, beetle_prob=a.beetle_prob)
 
 
 if __name__ == "__main__":

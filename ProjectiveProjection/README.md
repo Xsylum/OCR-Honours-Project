@@ -9,9 +9,9 @@ python -m ProjectiveProjection.camera --views 3
 Input (from `label_generation_pipeline.py`): `master_dataset_labels.json` and the images in `final_output_labels/`.
 Output: `projected_output_labels/label_<n>_v<k>.png`, one `projected_dataset_labels.json` with the warped boxes, and `preview_sheet.png` with the boxes drawn on the first views.
 
-Options: `--labels`, `--images`, `--out`, `--views`, `--seed`, `--label-width-mm` (default 22), `--image-size` (default 1024 768), `--pin-prob` (default 0.8), `--stack-prob` (default 0, off), `--max-stack` (default 3), `--sleeve-prob` (default 0.4), `--distortion` (default 1), `--no-effects`, `--save-masks`.
+Options: `--labels`, `--images`, `--out`, `--views`, `--seed`, `--label-width-mm` (default 22), `--image-size` (default 1024 768), `--pin-prob` (default 0, off), `--stack-prob` (default 0, off), `--max-stack` (default 3), `--sleeve-prob` (default 0, off), `--beetle-prob` (default 0.7), `--distortion` (default 1), `--no-effects`, `--save-masks`.
 
-For clean geometry only (no pin, sleeve, distortion or effects): `--no-effects --pin-prob 0`.
+For clean geometry only: `--no-effects --beetle-prob 0`.
 
 Example output is in [examples/](examples/); start with `examples/stages.jpg`.
 
@@ -29,7 +29,9 @@ Output boxes are 4-point quads (a rectangle stops being a rectangle under perspe
 
 ## Pin occluder (`occluders.py`)
 
-Each view gets an insect pin through the label with probability `--pin-prob`. The pin is real 3D geometry in the same world as the label:
+**Off by default** (`--pin-prob 0`); pass e.g. `--pin-prob 0.8` to turn it on.
+
+Each view can get an insect pin through the label. The pin is real 3D geometry in the same world as the label:
 
 - A steel shaft from a few mm below the paper up to a ball head 5-15 mm above it, with a random slight lean, diameter and head color.
 - Its two ends are projected with the same camera, and the shaft's width follows perspective. As a result the pin covers different text from different angles, which a flat 2D overlay can't do.
@@ -50,9 +52,21 @@ Real specimens have several labels on one pin (locality, date, determination...)
 
 Stacked labels appear in `occluders` with `type: "stacked_label"`.
 
+## Beetle body
+
+With probability `--beetle-prob` (default 0.7), a view gets an ellipsoid standing in for the pinned insect, floating about 2-3.5 mm above the paper:
+
+- Size varies a lot: about a third of views get a small oval, a third a medium one, and a third nearly as big as the label. Small ovals are placed on different parts of the name; large ones stay nearer the centre.
+- Anchored near the pin when one is present (optional; pin is off by default).
+- Kept **parallel to the label** (no pitch or yaw); only the camera is oblique. Beetle views are spread across a ladder of steep tilts from about 52° to 72° (a few degrees apart per view, ±2° jitter), looking across the body so the handwriting peeks out from under it. About half the views also zoom in close (label filling most of the frame) for clearer shots of the name.
+- Casts a soft shadow on the label from the view's light direction.
+- Appears in `occluders` with `type: "beetle"`, and its pixels count toward each box's `occluded_fraction`.
+
 ## Plastic sleeve (`sleeve.py`)
 
-With probability `--sleeve-prob` (default 0.4), the label is inside a clear protective film: a plane 0.2-0.8 mm above the paper, overhanging it by 0.5-2.5 mm and slightly crooked. It is drawn with the same camera, as a layer in the back-to-front order (so the pin and labels above it are drawn over it):
+**Off by default** (`--sleeve-prob 0`); pass e.g. `--sleeve-prob 0.4` to turn it on.
+
+When enabled, the label is inside a clear protective film: a plane 0.2-0.8 mm above the paper, overhanging it by 0.5-2.5 mm and slightly crooked. It is drawn with the same camera, as a layer in the back-to-front order:
 
 - **Haze and tint**: the film scatters 2-8% of the light, lifting the blacks and lowering text contrast, with a faint color cast.
 - **Glare**: a light source mirrors off the film. For every point of the film, the reflected light direction is compared with the direction to the camera, using the normal of a height field (gentle waviness plus a few creases). The highlight therefore moves with the viewpoint and breaks into streaks along creases. The light is aimed so the highlight lands somewhere around the label, often partly off it.
@@ -71,7 +85,7 @@ Views with effects get radial and tangential lens distortion (OpenCV's Brown-Con
 The pin's pixels and the labels above the target form an occlusion mask (`--save-masks` writes it out). Each box gets:
 
 - `visible_fraction`: the share of the box that is in the photo and not covered.
-- `occluded_fraction`: the share of the in-frame box covered by the pin or a label above it.
+- `occluded_fraction`: the share of the in-frame box covered by the pin, the beetle, or a label above it.
 - `glare_fraction`: the share of the in-frame box washed out by sleeve glare (0 without a sleeve).
 
 In `preview_sheet.png`, red boxes are occluded, magenta boxes have glare and blue boxes are clear.
@@ -92,5 +106,5 @@ Tests: `python -m pytest tests`.
 
 ## Not done yet
 
-- The beetle itself above the label. It would use the same approach as the pin, e.g. an ellipsoid body projected through the camera.
 - Paper curl (the label and sleeve are flat planes here).
+- A more detailed beetle (legs, elytra split) — the ellipsoid is enough for the occlusion / look-under training case.
