@@ -154,15 +154,18 @@ def test_oblique_view_sees_under_the_beetle():
 def test_sample_beetle_varies_size_and_position():
     rng = np.random.default_rng(2)
     label_mm = (22.0, 5.5)
-    fracs, centres = [], []
+    fracs, centres, yaws = [], [], []
     for _ in range(40):
         beetle = sample_beetle(rng, label_mm)
         a, b, _ = beetle.radii_mm
         fracs.append(np.pi * a * b / (label_mm[0] * label_mm[1]))
         centres.append(beetle.centre_mm[:2])
+        yaws.append(beetle.yaw_deg)
         assert beetle.bottom_z() < -1.5  # high enough that oblique views can look under
+        assert beetle.pitch_deg == 0.0  # always parallel to the label plane
     assert min(fracs) < 0.30 and max(fracs) > 0.70  # both small and label-sized show up
     assert np.ptp(centres, axis=0).min() > 1.0  # centres land on different parts of the label
+    assert 0.0 in yaws and any(abs(y) == 90.0 for y in yaws)  # along-name and across-name
 
 
 def test_fogged_sleeve_blurs_the_text():

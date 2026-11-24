@@ -317,10 +317,12 @@ def sample_beetle(rng, label_mm, pin=None, cover=(0.12, 0.95)):
         cx = float(rng.uniform(-max_ox, max_ox))
         cy = float(rng.uniform(-max_oy, max_oy))
     centre_z = -(c + gap)
-    # Flat and parallel to the label (no pitch / yaw): only the camera is oblique.
+    # Flat on the label plane (no pitch). About half the time the long axis runs along the
+    # name; the other half it's turned 90° so the oval sits across the label instead.
+    yaw = 0.0 if rng.uniform() < 0.5 else float(rng.choice([90.0, -90.0]))
     beetle = BeetleBody(centre_mm=(float(cx), float(cy), float(centre_z)),
                         radii_mm=(float(a), float(b), float(c)),
-                        yaw_deg=0.0,
+                        yaw_deg=yaw,
                         pitch_deg=0.0,
                         color_bgr=tuple(int(v) for v in rng.integers([20, 30, 40], [55, 80, 110])))
     if pin is not None:

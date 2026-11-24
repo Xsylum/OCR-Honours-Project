@@ -58,7 +58,7 @@ With probability `--beetle-prob` (default 0.7), a view gets an ellipsoid standin
 
 - Size varies a lot: about a third of views get a small oval, a third a medium one, and a third nearly as big as the label. Small ovals are placed on different parts of the name; large ones stay nearer the centre.
 - Anchored near the pin when one is present (optional; pin is off by default).
-- Kept **parallel to the label** (no pitch or yaw); only the camera is oblique. Beetle views are spread across a ladder of steep tilts from about 52° to 72° (a few degrees apart per view, ±2° jitter), looking across the body so the handwriting peeks out from under it. About half the views also zoom in close (label filling most of the frame) for clearer shots of the name.
+- Kept **parallel to the label plane** (no pitch). About half the time the long axis runs along the name; the other half it's turned ±90° so the oval sits across the label and covers the handwriting differently. Only the camera is oblique. Beetle views are spread across a ladder of steep tilts from about 52° to 72° (a few degrees apart per view, ±2° jitter), looking across the body so the handwriting peeks out from under it. About half the views also zoom in close (label filling most of the frame) for clearer shots of the name.
 - Casts a soft shadow on the label from the view's light direction.
 - Appears in `occluders` with `type: "beetle"`, and its pixels count toward each box's `occluded_fraction`.
 
