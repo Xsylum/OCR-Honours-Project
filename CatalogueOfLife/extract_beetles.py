@@ -1,87 +1,43 @@
 import os
 import zipfile
 import pandas as pd
-from download_col import ensure_col_zip
 
-def get_names_list():
-    columns = [
-        "col:rank",
-        "col:status",
-        "col:order",
-        "col:class",
-        "col:phylum",
-        "col:genericName",
-        "col:specificEpithet"
-    ]
+try:
+    from .download_col import ensure_col_zip          # when imported as CatalogueOfLife.extract_beetles
+except ImportError:
+    from download_col import ensure_col_zip           # when this file is run directly
 
-    # 1. Get the absolute path of the directory this script lives in
+
+def get_names_list(limit=10):
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    zip_path = ensure_col_zip # Will download catalogue of life if not already hosted locally
+    names_path = os.path.join(current_dir, "beetle_names.txt")
 
-    with zipfile.ZipFile(zip_path) as zf:
-        # Find NameUsage.tsv even if it's nested in a subfolder inside the zip
-        member = next(n for n in zf.namelist() if n.endswith("NameUsage.tsv"))
-        with zf.open(member) as f:
-            df = pd.read_csv(
-                f, sep="\t", usecols=columns,
-                on_bad_lines="skip", low_memory=False,
-            )
-    
-    # 2. Seamlessly anchor the TSV folder path relative to this script
-    tsv_path = os.path.join(current_dir, "c0d033b6-1612-448b-ac4c-b8771774d0d3", "NameUsage.tsv")
+    if os.path.exists(names_path):                     # cached: skip the huge TSV entirely
+        with open(names_path, encoding="utf-8") as f:
+            names = [line.strip() for line in f if line.strip()]
+    else:
+        columns = ["col:rank", "col:status", "col:order", "col:class",
+                   "col:phylum", "col:genericName", "col:specificEpithet"]
+        zip_path = ensure_col_zip()                    # downloads Catalogue of Life if it isn't on disk
+        parts = []
+        with zipfile.ZipFile(zip_path) as zf:
+            member = next(n for n in zf.namelist() if n.endswith("NameUsage.tsv"))
+            with zf.open(member) as f:
+                for chunk in pd.read_csv(f, sep="\t", usecols=columns, dtype=str,
+                                         on_bad_lines="skip", chunksize=200_000):
+                    keep = chunk[
+                        (chunk["col:rank"] == "species") &
+                        (chunk["col:status"] == "accepted") &
+                        (chunk["col:order"] == "Coleoptera") &
+                        (chunk["col:class"] == "Insecta") &
+                        (chunk["col:phylum"] == "Arthropoda")
+                    ].dropna(subset=["col:genericName", "col:specificEpithet"])
+                    parts.append(keep["col:genericName"].str.strip() + " " +
+                                 keep["col:specificEpithet"].str.strip())
+        series = pd.concat(parts).drop_duplicates()
+        series = series[series.str.match(r"^[A-Z][A-Za-z]+ [a-z]+$")]   # simple ASCII binomials
+        series.to_csv(names_path, index=False, header=False)
+        names = series.tolist()
 
-    df = pd.read_csv(
-        tsv_path,
-        sep="\t",
-        usecols=columns,
-        on_bad_lines="skip",
-        low_memory=False
-    )
-
-    # Keep accepted species only
-    species = df[
-        (df["col:rank"] == "species") &
-        (df["col:status"] == "accepted") &
-        (df["col:order"] == "Coleoptera") &
-        (df["col:class"] == "Insecta") &
-        (df["col:phylum"] == "Arthropoda")
-    ].copy()
-
-    # Remove rows missing either part of the binomial
-    species = species.dropna(
-        subset=["col:genericName", "col:specificEpithet"]
-    )
-
-    # Construct "Genus species"
-    species["name"] = (
-        species["col:genericName"].str.strip()
-        + " "
-        + species["col:specificEpithet"].str.strip()
-    )
-
-    # Remove duplicates
-    names = species["name"].drop_duplicates()
-
-    # Keep simple ASCII binomial names
-    names = names[
-        names.str.match(r"^[A-Z][A-Za-z]+ [a-z]+$")
-    ]
-
-    # Save one name per line
-    names.to_csv(
-        "beetle_names.txt",
-        index=False,
-        header=False
-    )
-
-    print(f"Extracted {len(names):,} beetle species.")
-
-    print("\nFirst 20:")
-    for name in names.head(20):
-        print(name)
-
-    # TODO this should change to whole list, just doing head 10 for pipeline example
-    output_list = []
-    for name in names.head(10):
-        output_list.append(name)
-    return output_list
+    print(f"{len(names):,} beetle species available.")
+    return names[:limit]

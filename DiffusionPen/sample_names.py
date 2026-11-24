@@ -591,7 +591,9 @@ def main():
     
     parser.add_argument('--text', type=str, default='text word', help='words to generate, separated by spaces')
     parser.add_argument('--style_id', type=int, default=12, help='writer/style index, 0-338')
+    parser.add_argument('--style_seed', type=int, default=0, help='picks which 5 reference words define the style')
     args = parser.parse_args()
+    random.seed(args.style_seed)
     
     print('torch version', torch.__version__)
     
